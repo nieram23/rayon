@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/bricolage-grotesque/index.css';
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
+
+/* ==================================================================
+   RAYON — design system
+   Inspiration : signalétique de magasin, étiquettes prix, linéaires.
+   ================================================================== */
+
+@theme {
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-sans: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Neutres chauds */
+  --color-ink: #16181d;
+  --color-ink-2: #3b3f48;
+  --color-ink-3: #6b7079;
+  --color-line: #e2ddd1;
+  --color-line-2: #d3ccbc;
+  --color-paper: #f5f2ea;
+  --color-card: #fffdf8;
+
+  /* Accent « étiquette prix » */
+  --color-tag: #f2c14e;
+  --color-tag-soft: #fcf1d3;
+
+  /* Partie 1 — Réserve (opérations préalables) */
+  --color-p1: #1f8a70;
+  --color-p1-dark: #145c4b;
+  --color-p1-soft: #e2f1eb;
+
+  /* Partie 2 — Vitrine (unité attractive) */
+  --color-p2: #e0623a;
+  --color-p2-dark: #a5401f;
+  --color-p2-soft: #fbe7de;
+
+  /* Partie 3 — Clientèle */
+  --color-p3: #3f63c9;
+  --color-p3-dark: #2a4594;
+  --color-p3-soft: #e5ebfa;
+
+  /* Échelle de maîtrise (reprend les codes couleur de la grille) */
+  --color-m0: #9aa0a6;
+  --color-m1: #c8372d;
+  --color-m2: #e39a2d;
+  --color-m3: #74b04a;
+  --color-m4: #2e8b4e;
+
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 0 rgb(22 24 29 / 0.04), 0 6px 18px -10px rgb(22 24 29 / 0.18);
+  --shadow-lift: 0 2px 0 rgb(22 24 29 / 0.05), 0 18px 32px -18px rgb(22 24 29 / 0.35);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-tag);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: var(--color-tag-soft);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-[var(--radius-card)] border border-line bg-card;
+    box-shadow: var(--shadow-card);
+  }
+  .card-lift {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+  }
+  .eyebrow {
+    @apply font-sans text-[0.75rem] font-bold tracking-[0.12em] uppercase text-ink-3;
+  }
+  /* Étiquette prix : code de dossier avec encoche */
+  .price-tag {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem 0.2rem 0.95rem;
+    border-radius: 0.35rem 0.5rem 0.5rem 0.35rem;
+    clip-path: polygon(0.55rem 0, 100% 0, 100% 100%, 0.55rem 100%, 0 50%);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+  }
+  .price-tag::before {
+    content: '';
+    width: 0.3rem;
+    height: 0.3rem;
+    border-radius: 999px;
+    background: var(--color-paper);
+    position: absolute;
+    left: 0.45rem;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  /* Bandes de linéaire en fond de section */
+  .shelf-lines {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 46px,
+      rgb(22 24 29 / 0.06) 46px,
+      rgb(22 24 29 / 0.06) 48px
+    );
+  }
+  .hatch {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgb(22 24 29 / 0.05) 0,
+      rgb(22 24 29 / 0.05) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
