@@ -1,6 +1,7 @@
 -- ============================================================================
 -- Rayon · schéma de la base Supabase
--- À coller une seule fois dans Supabase > SQL Editor > New query > Run.
+-- Installé automatiquement par la page #/installation (fonction api/admin.ts),
+-- ou à coller dans Supabase > SQL Editor > New query > Run.
 -- Le script peut être relancé sans danger (il ne supprime aucune donnée).
 -- ============================================================================
 
@@ -68,10 +69,11 @@ create policy "donnees lecture" on public.user_data
   for select to authenticated
   using (user_id = auth.uid() or public.is_admin());
 
+-- Seuls les comptes créés par l'administrateur (qui ont un profil) peuvent enregistrer des données.
 drop policy if exists "donnees ajout" on public.user_data;
 create policy "donnees ajout" on public.user_data
   for insert to authenticated
-  with check (user_id = auth.uid() or public.is_admin());
+  with check ((user_id = auth.uid() and exists (select 1 from public.profiles where id = auth.uid())) or public.is_admin());
 
 drop policy if exists "donnees modification" on public.user_data;
 create policy "donnees modification" on public.user_data

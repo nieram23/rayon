@@ -23,47 +23,29 @@ Aucun mot de passe n'est écrit dans le code. Le mot de passe administrateur et 
    Les fichiers cachés `.gitignore` et `.env.example` doivent faire partie du premier envoi. Sur Mac, Cmd + Maj + . les fait apparaître dans le Finder.
 5. Vérifie que le dépôt contient bien `api`, `src`, `supabase`, `package.json` et `vercel.json`.
 
-## Étape 2 · Créer la base Supabase
+## Étape 2 · Publier avec Vercel, avec la base de données Supabase intégrée
 
-1. Sur supabase.com, crée un compte, puis **New project**.
-   - Nom : `rayon`.
-   - Mot de passe de la base : laisse Supabase en générer un. Il ne sert pas au site.
-   - Région : **Europe (Paris)** ou une autre région d'Europe.
-2. Attends la fin de la création, environ 2 minutes.
-3. Menu de gauche **SQL Editor**, puis **New query**. Colle tout le contenu du fichier `supabase/schema.sql` et clique sur **Run**. Le message « Success » doit s'afficher.
-4. Menu **Authentication**, puis **Sign In / Providers** (ou **Providers**), puis **Email** :
-   - désactive **Allow new users to sign up**, pour que seuls les comptes que tu crées existent ;
-   - désactive **Confirm email**, car aucun courriel n'est envoyé.
-   Enregistre.
-5. Menu **Project Settings**, puis **API** (ou **Data API** et **API Keys**). Note trois valeurs :
-   - **Project URL**, de la forme `https://xxxx.supabase.co` ;
-   - la clé **anon / public**, aussi appelée *publishable* ;
-   - la clé **service_role**, aussi appelée *secret*. ⚠️ Elle ne doit jamais être partagée.
-
-## Étape 3 · Publier avec Vercel
-
-1. Sur vercel.com, crée un compte avec **Continue with GitHub**.
+1. Sur vercel.com, connecte-toi avec **Continue with GitHub**.
 2. **Add New…**, puis **Project**, puis **Import** sur le dépôt `rayon`.
-3. Avant de cliquer sur Deploy, ouvre **Environment Variables** et ajoute ces 5 variables :
+3. Dans « Optional Integrations », clique sur **Add** à côté de **Supabase** et choisis **Create New Supabase Account (Vercel Native)**.
+   - Offre : **Free**.
+   - Région : **Europe** (Frankfurt, Paris, London ou Ireland).
+   Vercel crée la base et renseigne tout seul l'adresse et les clés (variables `SUPABASE_…`, `NEXT_PUBLIC_SUPABASE_…` et `POSTGRES_…`).
+4. Ajoute 2 variables d'environnement :
+   - `ADMIN_USERNAME` = `m.bournicon` ;
+   - `ADMIN_PASSWORD` = ton mot de passe administrateur.
+5. Clique sur **Deploy**.
 
-| Nom | Valeur |
-|---|---|
-| `VITE_SUPABASE_URL` | la Project URL |
-| `VITE_SUPABASE_ANON_KEY` | la clé anon / public |
-| `SUPABASE_SERVICE_ROLE_KEY` | la clé service_role |
-| `ADMIN_USERNAME` | `m.bournicon` |
-| `ADMIN_PASSWORD` | ton mot de passe administrateur |
-
-4. Clique sur **Deploy**. Au bout d'une minute environ, Vercel affiche l'adresse du site.
-
-## Étape 4 · Créer le compte administrateur (une seule fois)
+## Étape 3 · Mise en service (une seule fois)
 
 1. Ouvre `https://ton-adresse.vercel.app/#/installation`.
-2. Clique sur **Créer le compte administrateur**.
+2. Clique sur **Créer le compte administrateur**. Le site installe lui-même les tables et les règles d'accès de la base, puis crée ton compte.
 3. Connecte-toi avec `m.bournicon` et ton mot de passe.
 4. Pour créer les comptes élèves, va dans **Espace enseignant**, puis **Comptes élèves**.
 
-Une fois le compte créé, tu peux supprimer la variable `ADMIN_PASSWORD` dans Vercel. Le compte reste valable. La page d'installation ne fait plus rien si un administrateur existe déjà.
+Une fois ton compte créé, tu peux supprimer la variable `ADMIN_PASSWORD` dans Vercel. La page d'installation ne fait plus rien dès qu'un administrateur existe.
+
+Si tu préfères utiliser une base Supabase créée à la main, colle `supabase/schema.sql` dans son éditeur SQL. Renseigne ensuite `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY` dans Vercel.
 
 ---
 

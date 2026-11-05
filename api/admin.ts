@@ -11,11 +11,36 @@
  *  - delete       : supprime un compte et ses données (administrateur).
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import pg from 'pg';
 
 // Doit rester identique à src/lib/accounts.ts
 const EMAIL_DOMAIN = 'rayon-mcv.example.com';
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,39}$/;
 const MAX_BATCH = 60;
+
+/** Schéma de la base (copie de supabase/schema.sql, vérifiée par un test). */
+export const SCHEMA_SQL = "-- ============================================================================\n-- Rayon · schéma de la base Supabase\n-- Installé automatiquement par la page #/installation (fonction api/admin.ts),\n-- ou à coller dans Supabase > SQL Editor > New query > Run.\n-- Le script peut être relancé sans danger (il ne supprime aucune donnée).\n-- ============================================================================\n\n-- 1. Profils : un par compte (élève ou administrateur).\ncreate table if not exists public.profiles (\n  id           uuid primary key references auth.users (id) on delete cascade,\n  username     text not null unique,\n  display_name text not null,\n  class_label  text not null default '',\n  role         text not null default 'student' check (role in ('admin', 'student')),\n  created_at   timestamptz not null default now(),\n  last_seen_at timestamptz\n);\n\n-- 2. Données de travail : une ligne par clé (réponses d'un dossier, autoévaluation…).\ncreate table if not exists public.user_data (\n  user_id    uuid not null references auth.users (id) on delete cascade,\n  key        text not null,\n  value      jsonb not null,\n  updated_at timestamptz not null default now(),\n  primary key (user_id, key)\n);\n\ncreate index if not exists user_data_user_idx on public.user_data (user_id);\n\n-- 3. Fonction utilitaire : l'utilisateur connecté est-il administrateur ?\n--    « security definer » évite une boucle avec les règles de la table profiles.\ncreate or replace function public.is_admin()\nreturns boolean\nlanguage sql\nstable\nsecurity definer\nset search_path = public\nas $$\n  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');\n$$;\n\n-- 4. Mise à jour de la dernière connexion, appelée par l'application.\ncreate or replace function public.touch_last_seen()\nreturns void\nlanguage sql\nsecurity definer\nset search_path = public\nas $$\n  update public.profiles set last_seen_at = now() where id = auth.uid();\n$$;\n\ngrant execute on function public.is_admin() to authenticated;\ngrant execute on function public.touch_last_seen() to authenticated;\n\n-- 5. Règles d'accès (Row Level Security).\nalter table public.profiles  enable row level security;\nalter table public.user_data enable row level security;\n\n-- Profils : chacun lit le sien, l'administrateur lit tout.\n-- Création, modification et suppression : uniquement par le serveur (clé de service).\ndrop policy if exists \"profil lisible par soi ou admin\" on public.profiles;\ncreate policy \"profil lisible par soi ou admin\" on public.profiles\n  for select to authenticated\n  using (id = auth.uid() or public.is_admin());\n\n-- Données : chaque élève lit et écrit uniquement les siennes.\ndrop policy if exists \"donnees lecture\" on public.user_data;\ncreate policy \"donnees lecture\" on public.user_data\n  for select to authenticated\n  using (user_id = auth.uid() or public.is_admin());\n\n-- Seuls les comptes créés par l'administrateur (qui ont un profil) peuvent enregistrer des données.\ndrop policy if exists \"donnees ajout\" on public.user_data;\ncreate policy \"donnees ajout\" on public.user_data\n  for insert to authenticated\n  with check ((user_id = auth.uid() and exists (select 1 from public.profiles where id = auth.uid())) or public.is_admin());\n\ndrop policy if exists \"donnees modification\" on public.user_data;\ncreate policy \"donnees modification\" on public.user_data\n  for update to authenticated\n  using (user_id = auth.uid() or public.is_admin())\n  with check (user_id = auth.uid() or public.is_admin());\n\ndrop policy if exists \"donnees suppression\" on public.user_data;\ncreate policy \"donnees suppression\" on public.user_data\n  for delete to authenticated\n  using (user_id = auth.uid() or public.is_admin());\n\n-- Aucun accès pour les visiteurs non connectés.\nrevoke all on public.profiles  from anon;\nrevoke all on public.user_data from anon;\ngrant select on public.profiles to authenticated;\ngrant select, insert, update, delete on public.user_data to authenticated;\n";
+
+/**
+ * Installe ou met à jour les tables et les règles d'accès, si la connexion directe
+ * à la base est disponible (variables POSTGRES_… créées par l'intégration Vercel).
+ * Renvoie false si aucune connexion n'est configurée (schéma installé à la main).
+ */
+async function installSchema(): Promise<boolean> {
+  const e = process.env;
+  const raw = e.POSTGRES_URL_NON_POOLING || e.POSTGRES_URL || e.DATABASE_URL;
+  if (!raw) return false;
+  // Le paramètre sslmode de l'adresse impose une vérification que le certificat de Supabase ne passe pas ici.
+  const connectionString = raw.replace(/([?&])sslmode=[^&]*&?/, '$1').replace(/[?&]$/, '');
+  const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
+  await client.connect();
+  try {
+    await client.query(SCHEMA_SQL);
+  } finally {
+    await client.end();
+  }
+  return true;
+}
 
 type Req = { method?: string; headers: Record<string, string | string[] | undefined>; body?: unknown };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void; setHeader: (k: string, v: string) => void };
@@ -40,9 +65,10 @@ function cleanText(v: unknown, max: number): string {
 }
 
 function adminClient(): SupabaseClient | null {
-  // Même base que le navigateur (VITE_SUPABASE_URL) : une intégration Vercel peut définir un autre SUPABASE_URL.
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Même base que le site : nos noms de variables, ou ceux de l'intégration Supabase de Vercel.
+  const e = process.env;
+  const url = e.VITE_SUPABASE_URL || e.NEXT_PUBLIC_SUPABASE_URL || e.SUPABASE_URL;
+  const key = e.SUPABASE_SERVICE_ROLE_KEY || e.SUPABASE_SECRET_KEY;
   if (!url || !key) return null;
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
@@ -95,14 +121,25 @@ export default async function handler(req: Req, res: Res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée.' });
 
   const sb = adminClient();
-  if (!sb) return res.status(500).json({ error: 'Serveur non configuré : variables SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY manquantes.' });
+  if (!sb) return res.status(500).json({ error: 'Serveur non configuré : relie une base Supabase au projet Vercel (ou ajoute SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY), puis redéploie.' });
 
   const body = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {}) as Record<string, unknown>;
   const action = body.action;
 
   try {
     if (action === 'bootstrap') {
-      const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin');
+      const countAdmins = () => sb.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin');
+      let { count, error: countErr } = await countAdmins();
+      // Première mise en service : tables absentes ou aucun administrateur → installation du schéma.
+      if (countErr || (count ?? 0) === 0) {
+        try {
+          await installSchema();
+        } catch (err) {
+          return res.status(500).json({ error: `Installation de la base impossible : ${err instanceof Error ? err.message : 'erreur inconnue'}` });
+        }
+        ({ count, error: countErr } = await countAdmins());
+      }
+      if (countErr) return res.status(500).json({ error: `Base non prête : ${countErr.message}. Lance supabase/schema.sql dans l’éditeur SQL de Supabase.` });
       if ((count ?? 0) > 0) return res.status(200).json({ ok: true, created: false, message: 'Le compte administrateur existe déjà.' });
       const password = process.env.ADMIN_PASSWORD;
       if (!password) return res.status(500).json({ error: 'Variable ADMIN_PASSWORD manquante dans Vercel.' });

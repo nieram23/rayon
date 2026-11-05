@@ -74,7 +74,23 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-const { default: handler } = await import('../../../api/admin');
+const pgCalls: string[] = [];
+vi.mock('pg', () => ({
+  default: {
+    Client: class {
+      constructor(public opts: { connectionString: string }) {
+        pgCalls.push('new:' + opts.connectionString);
+      }
+      async connect() {}
+      async query(sql: string) {
+        pgCalls.push('query:' + sql.length);
+      }
+      async end() {}
+    },
+  },
+}));
+
+const { default: handler, SCHEMA_SQL } = await import('../../../api/admin');
 
 async function call(body: unknown, token?: string) {
   let status = 0;
@@ -112,6 +128,22 @@ describe('API comptes', () => {
     const r2 = await call({ action: 'bootstrap' });
     expect(r2.json.created).toBe(false);
     expect(db.users).toHaveLength(1);
+  });
+
+  it('installe le schéma à la première mise en service, puis plus jamais', async () => {
+    pgCalls.length = 0;
+    process.env.POSTGRES_URL_NON_POOLING = 'postgres://u:p@h:5432/postgres?sslmode=require';
+    await call({ action: 'bootstrap' });
+    expect(pgCalls[0]).toBe('new:postgres://u:p@h:5432/postgres');
+    expect(pgCalls[1]).toBe('query:' + SCHEMA_SQL.length);
+    await call({ action: 'bootstrap' });
+    expect(pgCalls).toHaveLength(2);
+    delete process.env.POSTGRES_URL_NON_POOLING;
+  });
+
+  it('le schéma intégré est identique à supabase/schema.sql', async () => {
+    const fs = await import('fs');
+    expect(SCHEMA_SQL).toBe(fs.readFileSync('supabase/schema.sql', 'utf8'));
   });
 
   it('refuse les actions sans être administrateur', async () => {
