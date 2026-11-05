@@ -8,13 +8,16 @@ import { buildResultsCsv, exportResults } from '../../lib/exportCsv';
 import { formatDate } from '../../lib/theme';
 import { DEMO_OPEN_UNITS } from '../../services/studentData';
 import { useTeacher } from '../../state/useTeacher';
+import { getBackend } from '../../services/cloud';
+
+const CLOUD_ON = !!getBackend();
 
 export function TeacherPageHeader({ eyebrow, title, children, real }: { eyebrow: string; title: string; children?: ReactNode; real?: boolean }) {
   return (
     <header className="mb-6 flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <p className="eyebrow">{eyebrow}</p>
-        {!real && <DataModeTag mode="demo-enseignant" />}
+        {!real && !CLOUD_ON && <DataModeTag mode="demo-enseignant" />}
       </div>
       <h1 className="text-[1.8rem] font-extrabold sm:text-[2.2rem]">{title}</h1>
       {children && <div className="max-w-3xl text-ink-2">{children}</div>}
@@ -32,7 +35,9 @@ export function TeacherDashboard() {
   return (
     <div className="flex flex-col gap-10">
       <TeacherPageHeader eyebrow="Tableau de bord professeur" title="Vue d’ensemble">
-        Suivi collectif et individuel. Les chiffres ci-dessous proviennent d’un jeu de données fictif : aucun élève réel n’est représenté.
+        {t.real
+          ? 'Suivi collectif et individuel de tes élèves, à partir de leurs réponses enregistrées.'
+          : 'Suivi collectif et individuel. Les chiffres ci-dessous proviennent d’un jeu de données fictif : aucun élève réel n’est représenté.'}
       </TeacherPageHeader>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -56,7 +61,7 @@ export function TeacherDashboard() {
         <div className="card divide-y divide-line">
           {UNITS.filter((u) => DEMO_OPEN_UNITS.includes(u.id)).map((u) => {
             const rows = t.students.map((s) => s.progress.find((p) => p.unitId === u.id));
-            const avg = rows.reduce((n, p) => n + progressRatio(p), 0) / t.students.length;
+            const avg = t.students.length ? rows.reduce((n, p) => n + progressRatio(p), 0) / t.students.length : 0;
             const started = rows.filter((p) => statusOf(p) !== 'non-commence').length;
             const done = rows.filter((p) => statusOf(p) === 'termine').length;
             return (
@@ -72,7 +77,12 @@ export function TeacherDashboard() {
               </div>
             );
           })}
-          <p className="p-4 text-[0.85rem] text-ink-3 sm:px-5">Les 12 autres unités ne sont pas encore ouvertes.</p>
+          {UNITS.length > DEMO_OPEN_UNITS.length && (
+            <p className="p-4 text-[0.85rem] text-ink-3 sm:px-5">
+              {UNITS.length - DEMO_OPEN_UNITS.length === 1 ? 'Une unité n’est' : `${UNITS.length - DEMO_OPEN_UNITS.length} unités ne sont`} pas encore ouverte
+              {UNITS.length - DEMO_OPEN_UNITS.length > 1 ? 's' : ''}.
+            </p>
+          )}
         </div>
       </section>
 
@@ -80,6 +90,7 @@ export function TeacherDashboard() {
         <section aria-labelledby="t-diff">
           <SectionHeader id="t-diff" eyebrow="Difficultés rencontrées" title="À accompagner" />
           <ul className="card divide-y divide-line">
+            {t.difficulties.length === 0 && <li className="p-4 text-[0.9rem] text-ink-3">Aucune difficulté repérée pour l’instant.</li>}
             {t.difficulties.slice(0, 6).map((d, i) => (
               <li key={i}>
                 <Link to={`/enseignant/eleves/${d.studentId}`} className="flex items-start gap-3 p-4 hover:bg-ink/3">
@@ -105,6 +116,7 @@ export function TeacherDashboard() {
             }
           />
           <ul className="card divide-y divide-line">
+            {t.productions.length === 0 && <li className="p-4 text-[0.9rem] text-ink-3">Aucune production rendue pour l’instant.</li>}
             {[...t.productions]
               .sort((a, b) => (b.submittedAt > a.submittedAt ? 1 : -1))
               .slice(0, 6)
@@ -132,7 +144,7 @@ export function TeacherDashboard() {
         <Link to="/enseignant/eleves" className="card card-lift flex items-center gap-3 p-5 font-bold">
           <Users className="size-5" aria-hidden /> Liste des élèves
         </Link>
-        <Button variant="secondary" className="h-full min-h-16 justify-start rounded-[var(--radius-card)] px-5" onClick={async () => setMsg(await exportResults('rayon-resultats-demo.csv', buildResultsCsv(t.students)))}>
+        <Button variant="secondary" className="h-full min-h-16 justify-start rounded-[var(--radius-card)] px-5" onClick={async () => setMsg(await exportResults(t.real ? 'rayon-resultats.csv' : 'rayon-resultats-demo.csv', buildResultsCsv(t.students)))}>
           <Download className="size-5" aria-hidden /> Exporter les résultats (CSV)
         </Button>
         {msg && (

@@ -92,7 +92,7 @@ export function Profil() {
         </section>
       )}
 
-      <section aria-labelledby="mode" className="card p-5 sm:p-6">
+      {!cloud && <section aria-labelledby="mode" className="card p-5 sm:p-6">
         <h2 id="mode" className="mb-1 text-[1.2rem] font-bold">
           Données affichées
         </h2>
@@ -122,7 +122,7 @@ export function Profil() {
             );
           })}
         </div>
-      </section>
+      </section>}
 
       <section aria-labelledby="vie-privee" className="card p-5 sm:p-6">
         <h2 id="vie-privee" className="mb-3 flex items-center gap-2 text-[1.2rem] font-bold">

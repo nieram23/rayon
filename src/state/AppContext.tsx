@@ -3,6 +3,7 @@ import type { DataMode, StudentProfile } from '../domain/types';
 import { KEYS, isPersistent, readJSON, removeKey, writeJSON } from '../services/storage';
 import { CHAPTERS } from '../content/chapters';
 import { createStudentData, type StudentDataSource } from '../services/studentData';
+import { getBackend } from '../services/cloud';
 
 interface AppState {
   profile: StudentProfile | null;
@@ -24,7 +25,8 @@ const Ctx = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<StudentProfile | null>(() => readJSON<StudentProfile | null>(KEYS.profile, null));
-  const [mode, setModeState] = useState<DataMode>(() => readJSON<DataMode>(KEYS.mode, 'local'));
+  // Site en ligne : toujours les vraies données (le mode démonstration ne sert qu'à l'aperçu sans serveur).
+  const [mode, setModeState] = useState<DataMode>(() => (getBackend() ? 'local' : readJSON<DataMode>(KEYS.mode, 'local')));
   const [teacherRevision, setRev] = useState(0);
   const [dataRevision, setDataRev] = useState(0);
 

@@ -17,12 +17,14 @@ export function TeacherClasses() {
   return (
     <div>
       <TeacherPageHeader eyebrow="Vue des classes" title="Mes classes">
-        Classes fictives créées pour la démonstration. La création de classes et l’invitation des élèves arriveront avec l’authentification.
+        {t.real
+          ? 'Les classes sont celles indiquées sur les comptes élèves. Pour en créer une ou déplacer un élève, va dans « Comptes élèves ».'
+          : 'Classes fictives créées pour la démonstration.'}
       </TeacherPageHeader>
       <div className="grid gap-4 md:grid-cols-2">
         {t.classes.map((c) => {
           const st = t.students.filter((s) => s.classId === c.id);
-          const avg = st.reduce((n, s) => n + s.summary.overall, 0) / st.length;
+          const avg = st.length ? st.reduce((n, s) => n + s.summary.overall, 0) / st.length : 0;
           const rework = st.filter((s) => s.toRework > 0).length;
           return (
             <article key={c.id} className="card flex flex-col gap-4 p-5">
@@ -65,7 +67,7 @@ export function TeacherStudents() {
   return (
     <div>
       <TeacherPageHeader eyebrow="Vue des élèves" title="Élèves">
-        Résultats individuels. Les pseudonymes sont fictifs.
+        {t.real ? 'Résultats individuels de tes élèves.' : 'Résultats individuels. Les pseudonymes sont fictifs.'}
       </TeacherPageHeader>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <label className="sr-only" htmlFor="t-classe">
@@ -248,14 +250,16 @@ export function TeacherStudentDetail() {
           eyebrow="Grille d’évaluation à quatre niveaux"
           title="Valider les niveaux de maîtrise"
           action={
-            <Button variant="ghost" className="text-[0.85rem]" onClick={t.resetOverrides}>
-              <RotateCcw className="size-4" aria-hidden /> Annuler mes saisies (démo)
-            </Button>
+            t.real ? undefined : (
+              <Button variant="ghost" className="text-[0.85rem]" onClick={t.resetOverrides}>
+                <RotateCcw className="size-4" aria-hidden /> Annuler mes saisies (démo)
+              </Button>
+            )
           }
         />
         <p className="mb-4 max-w-3xl text-[0.9rem] text-ink-2">
-          Votre saisie remplace tout niveau indicatif. « NE » remet le résultat en « Non évalué ». Les saisies sont conservées dans ce navigateur
-          uniquement.
+          Votre saisie remplace tout niveau indicatif. « NE » remet le résultat en « Non évalué ».{' '}
+          {t.real ? 'Les niveaux sont enregistrés aussitôt et l’élève les voit dans son espace.' : 'Les saisies sont conservées dans ce navigateur uniquement.'}
         </p>
         <div className="flex flex-col gap-4">
           {units.map((u) => {

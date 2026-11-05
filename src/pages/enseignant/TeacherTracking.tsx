@@ -100,7 +100,7 @@ export function TeacherCompetences() {
       </TeacherPageHeader>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ClassFilter value={classe} onChange={setClasse} />
-        <Button variant="secondary" onClick={async () => setMsg(await exportResults('rayon-resultats-demo.csv', buildResultsCsv(students)))}>
+        <Button variant="secondary" onClick={async () => setMsg(await exportResults(t.real ? 'rayon-resultats.csv' : 'rayon-resultats-demo.csv', buildResultsCsv(students)))}>
           <Download className="size-4" aria-hidden /> Exporter (CSV)
         </Button>
       </div>
@@ -155,7 +155,7 @@ export function TeacherCompetences() {
 export function TeacherProductions() {
   const t = useTeacher();
   const [filter, setFilter] = useState<'toutes' | ProductionState>('toutes');
-  // Statut de correction modifiable pendant la session (démonstration, non persisté).
+  // Démonstration : statut gardé pendant la session. Site en ligne : enregistré dans les données de l'élève.
   const [corrected, setCorrected] = useState<Record<string, ProductionState>>({});
   const state = (id: string, base: ProductionState) => corrected[id] ?? base;
   const list = [...t.productions]
@@ -166,8 +166,8 @@ export function TeacherProductions() {
   return (
     <div className="flex flex-col gap-6">
       <TeacherPageHeader eyebrow="Résultats et productions" title="Travaux rendus">
-        Les productions ouvertes (courriels, justifications, plans) seront corrigées par l’enseignant : la plateforme ne prétendra pas les corriger
-        automatiquement.
+        Les productions rédigées (courriels, justifications, plans) rendues par les élèves. Elles sont corrigées par l’enseignant : la plateforme ne
+        les corrige pas automatiquement.
       </TeacherPageHeader>
       <FilterGroup<'toutes' | ProductionState>
         label="Filtrer par état"
@@ -201,7 +201,11 @@ export function TeacherProductions() {
                 <Button
                   variant={st === 'a-corriger' ? 'primary' : 'secondary'}
                   className="min-h-10 px-4 text-[0.85rem]"
-                  onClick={() => setCorrected((c) => ({ ...c, [p.id]: st === 'a-corriger' ? 'corrigee' : 'a-corriger' }))}
+                  onClick={() => {
+                    const next = st === 'a-corriger' ? 'corrigee' : 'a-corriger';
+                    setCorrected((c) => ({ ...c, [p.id]: next }));
+                    t.setProductionState(p.id, next);
+                  }}
                 >
                   {st === 'a-corriger' ? 'Marquer corrigée' : 'Corrigée ✓ — annuler'}
                 </Button>
@@ -210,10 +214,12 @@ export function TeacherProductions() {
           })}
         </ul>
       )}
-      <p className="text-[0.82rem] text-ink-3">
-        Unités concernées : {UNITS.filter((u) => DEMO_OPEN_UNITS.includes(u.id)).map((u) => u.title).join(' · ')}. Le statut de correction n’est pas
-        enregistré (démonstration).
-      </p>
+      {!t.real && (
+        <p className="text-[0.82rem] text-ink-3">
+          Unités concernées : {UNITS.filter((u) => DEMO_OPEN_UNITS.includes(u.id)).map((u) => u.title).join(' · ')}. Le statut de correction n’est pas
+          enregistré (démonstration).
+        </p>
+      )}
     </div>
   );
 }

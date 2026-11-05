@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, FlaskConical, FolderKanban, KeyRound, LayoutDashboard, Lock, LogOut, School, Target, Users } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Loader2, FlaskConical, FolderKanban, KeyRound, LayoutDashboard, Lock, LogOut, School, Target, Users } from 'lucide-react';
 import { useAuth } from '../../state/AuthContext';
+import { TeacherSourceProvider, useTeacherSource } from '../../state/TeacherSource';
 import { Logo } from '../illustrations';
 import { cx } from '../../lib/theme';
 
@@ -59,21 +60,11 @@ export function TeacherLayout() {
             <ArrowLeft className="size-4" aria-hidden /> Espace élève
           </Link>
         </div>
-        {!accountsPage && (
+        {!cloud && (
           <div className="flex items-start gap-2 bg-tag px-4 py-2 text-[0.82rem] text-ink sm:items-center sm:justify-center">
             <FlaskConical className="mt-0.5 size-4 shrink-0 sm:mt-0" aria-hidden />
             <p>
-              {cloud ? (
-                <>
-                  <strong>Démonstration.</strong> Ces pages de suivi utilisent encore des données fictives. Les vrais comptes et leur progression sont
-                  dans « Comptes élèves ».
-                </>
-              ) : (
-                <>
-                  <strong>Démonstration.</strong> Classes, élèves et résultats sont fictifs. Accès non protégé : en production, cet espace exigera une
-                  authentification enseignant.
-                </>
-              )}
+              <strong>Démonstration.</strong> Classes, élèves et résultats sont fictifs. Sur le site en ligne, cet espace affiche tes vrais élèves.
             </p>
           </div>
         )}
@@ -112,9 +103,46 @@ export function TeacherLayout() {
           </ul>
         </nav>
         <main className="min-w-0 flex-1">
-          <Outlet />
+          <TeacherSourceProvider>
+            <LoadGate skip={accountsPage}>
+              <Outlet />
+            </LoadGate>
+          </TeacherSourceProvider>
         </main>
       </div>
     </div>
   );
+}
+
+/** Attend le chargement des vrais élèves avant d'afficher les pages de suivi. */
+function LoadGate({ children, skip }: { children: ReactNode; skip: boolean }) {
+  const real = useTeacherSource();
+  if (skip || !real) return <>{children}</>;
+  if (real.loading && !real.source)
+    return (
+      <p className="inline-flex items-center gap-2 text-ink-3" role="status">
+        <Loader2 className="size-4 animate-spin" aria-hidden /> Chargement des élèves et de leurs résultats…
+      </p>
+    );
+  if (real.error && !real.source)
+    return (
+      <div className="card flex flex-col items-start gap-3 p-5" role="alert">
+        <p className="font-bold">Impossible de charger les résultats : {real.error}</p>
+        <button type="button" onClick={real.reload} className="font-bold underline underline-offset-4">
+          Réessayer
+        </button>
+      </div>
+    );
+  if (real.source && real.source.listStudents().length === 0)
+    return (
+      <div className="card flex max-w-2xl flex-col items-start gap-3 p-6">
+        <Users className="size-7" aria-hidden />
+        <h1 className="text-[1.5rem] font-extrabold">Aucun élève pour l’instant</h1>
+        <p className="text-ink-2">Crée les comptes de tes élèves : le tableau de bord, les classes et les résultats se rempliront au fur et à mesure qu’ils travaillent.</p>
+        <Link to="/enseignant/comptes" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-ink px-5 font-bold text-paper">
+          <KeyRound className="size-4" aria-hidden /> Créer les comptes élèves
+        </Link>
+      </div>
+    );
+  return <>{children}</>;
 }
